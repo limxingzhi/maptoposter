@@ -483,6 +483,34 @@ def fetch_features(point, dist, tags, name) -> GeoDataFrame | None:
         return None
 
 
+TEXT_POSITIONS = {
+    "bottom": {
+        "city": 0.14,
+        "country": 0.10,
+        "coords": 0.07,
+        "divider": 0.125,
+        "attr_y": 0.02,
+        "attr_va": "bottom",
+    },
+    "top": {
+        "city": 0.90,
+        "country": 0.85,
+        "coords": 0.82,
+        "divider": 0.875,
+        "attr_y": 0.98,
+        "attr_va": "top",
+    },
+    "center": {
+        "city": 0.53,
+        "country": 0.48,
+        "coords": 0.45,
+        "divider": 0.505,
+        "attr_y": 0.02,
+        "attr_va": "bottom",
+    },
+}
+
+
 def create_poster(
     city,
     country,
@@ -502,6 +530,7 @@ def create_poster(
     show_country=True,
     show_coords=True,
     show_attribution=True,
+    text_position="bottom",
 ):
     """
     Generate a complete map poster with roads, water, parks, and typography.
@@ -624,9 +653,10 @@ def create_poster(
     ax.set_xlim(crop_xlim)
     ax.set_ylim(crop_ylim)
 
-    # Layer 3: Gradients (Top and Bottom)
-    create_gradient_fade(ax, _theme['gradient_color'], location='bottom', zorder=10)
-    create_gradient_fade(ax, _theme['gradient_color'], location='top', zorder=10)
+    if text_position == "bottom":
+        create_gradient_fade(ax, _theme['gradient_color'], location='bottom', zorder=10)
+    elif text_position == "top":
+        create_gradient_fade(ax, _theme['gradient_color'], location='top', zorder=10)
 
     # Calculate scale factor based on smaller dimension (reference 12 inches)
     # This ensures text scales properly for both portrait and landscape orientations
@@ -693,11 +723,12 @@ def create_poster(
             family="monospace", weight="bold", size=adjusted_font_size
         )
 
-    # --- BOTTOM TEXT ---
+    pos = TEXT_POSITIONS[text_position]
+
     if show_city:
         ax.text(
             0.5,
-            0.14,
+            pos["city"],
             spaced_city,
             transform=ax.transAxes,
             color=_theme["text"],
@@ -709,7 +740,7 @@ def create_poster(
     if show_country:
         ax.text(
             0.5,
-            0.10,
+            pos["country"],
             display_country.upper(),
             transform=ax.transAxes,
             color=_theme["text"],
@@ -730,7 +761,7 @@ def create_poster(
 
         ax.text(
             0.5,
-            0.07,
+            pos["coords"],
             coords,
             transform=ax.transAxes,
             color=_theme["text"],
@@ -743,14 +774,13 @@ def create_poster(
     if show_city:
         ax.plot(
             [0.4, 0.6],
-            [0.125, 0.125],
+            [pos["divider"], pos["divider"]],
             transform=ax.transAxes,
             color=_theme["text"],
             linewidth=1 * scale_factor,
             zorder=11,
         )
 
-    # --- ATTRIBUTION (bottom right) ---
     if show_attribution:
         if FONTS:
             font_attr = FontProperties(fname=FONTS["light"], size=8)
@@ -759,13 +789,13 @@ def create_poster(
 
         ax.text(
             0.98,
-            0.02,
+            pos["attr_y"],
             "© OpenStreetMap contributors",
             transform=ax.transAxes,
             color=_theme["text"],
             alpha=0.5,
             ha="right",
-            va="bottom",
+            va=pos["attr_va"],
             fontproperties=font_attr,
             zorder=11,
         )
@@ -810,6 +840,7 @@ def generate_poster_bytes(
     show_country=True,
     show_coords=True,
     show_attribution=True,
+    text_position="bottom",
 ):
     buf = BytesIO()
     create_poster(
@@ -817,6 +848,7 @@ def generate_poster_bytes(
         width, height, country_label, name_label,
         display_city, display_country, fonts, theme,
         show_city, show_country, show_coords, show_attribution,
+        text_position=text_position,
     )
     return buf.getvalue()
 
@@ -1008,6 +1040,13 @@ Examples:
     parser.add_argument("--no-country", dest="show_country", action="store_false", help="Hide country name")
     parser.add_argument("--no-coords", dest="show_coords", action="store_false", help="Hide coordinates")
     parser.add_argument("--no-attribution", dest="show_attribution", action="store_false", help="Hide attribution")
+    parser.add_argument(
+        "--text-position",
+        dest="text_position",
+        choices=["bottom", "top", "center"],
+        default="bottom",
+        help="Position of text labels on the poster (default: bottom)",
+    )
 
     args = parser.parse_args()
 
@@ -1094,6 +1133,7 @@ Examples:
                 show_country=args.show_country,
                 show_coords=args.show_coords,
                 show_attribution=args.show_attribution,
+                text_position=args.text_position,
             )
 
         print("\n" + "=" * 50)

@@ -8,6 +8,7 @@
 - Run `python -m compileall . -q` after editing Python files to catch syntax errors.
 - Do not commit unless explicitly asked.
 - Follow the existing code style: no comments unless requested.
+- **Always update relevant documentation (README.md) when adding or changing features.**
 
 ## Testing the HTTP Server
 

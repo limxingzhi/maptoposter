@@ -57,6 +57,7 @@ def get_poster(
     show_country: bool = Query(True, description="Show country name"),
     show_coords: bool = Query(True, description="Show coordinates"),
     show_attribution: bool = Query(True, description="Show attribution"),
+    text_position: Literal["bottom", "top", "center"] = Query("bottom", description="Position of text labels"),
 ):
     available_themes = get_available_themes()
     if theme not in available_themes:
@@ -95,6 +96,7 @@ def get_poster(
             show_country=show_country,
             show_coords=show_coords,
             show_attribution=show_attribution,
+            text_position=text_position,
         )
 
         return Response(

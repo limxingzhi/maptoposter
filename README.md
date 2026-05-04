@@ -83,6 +83,7 @@ python create_map_poster.py --city <city> --country <country> [options]
 | **OPTIONAL:** `--no-country` | | Hide country name on poster | shown |
 | **OPTIONAL:** `--no-coords` | | Hide coordinates on poster | shown |
 | **OPTIONAL:** `--no-attribution` | | Hide OSM attribution on poster | shown |
+| **OPTIONAL:** `--text-position` | | Position of text labels: `bottom`, `top`, `center` | bottom |
 
 ### Multilingual Support - i18n
 
@@ -191,6 +192,12 @@ python create_map_poster.py -c "Budapest" -C "Hungary" -t copper_patina -d 8000 
 # Override center coordinates
 python create_map_poster.py --city "New York" --country "USA" -lat 40.776676 -long -73.971321 -t noir
 
+# Text at the top of the poster
+python create_map_poster.py -c "London" -C "UK" -t noir --text-position top
+
+# Text centered on the poster (no gradient fade)
+python create_map_poster.py -c "Tokyo" -C "Japan" -t japanese_ink --text-position center
+
 # List available themes
 python create_map_poster.py --list-themes
 
@@ -289,6 +296,7 @@ Interactive API documentation is available at `http://localhost:8000/docs` (Swag
 | `show_country` | Show country name | `true` |
 | `show_coords` | Show coordinates | `true` |
 | `show_attribution` | Show attribution | `true` |
+| `text_position` | Text label position: `bottom`, `top`, `center` | `bottom` |
 
 ### Examples
 
@@ -467,13 +475,35 @@ if railways is not None and not railways.empty:
 
 ### Typography Positioning
 
-All text uses `transform=ax.transAxes` (0-1 normalized coordinates):
+Text positions are controlled by the `--text-position` parameter (`bottom`, `top`, `center`). All text uses `transform=ax.transAxes` (0-1 normalized coordinates):
+
+**`bottom` (default)** — bottom gradient fade applied:
 
 ```text
-y=0.14  City name (spaced letters for Latin scripts)
+y=0.14  City name
 y=0.125 Decorative line
 y=0.10  Country name
 y=0.07  Coordinates
+y=0.02  Attribution (bottom-right)
+```
+
+**`top`** — top gradient fade applied:
+
+```text
+y=0.90  City name
+y=0.875 Decorative line
+y=0.85  Country name
+y=0.82  Coordinates
+y=0.98  Attribution (top-right)
+```
+
+**`center`** — no gradient fade:
+
+```text
+y=0.53  City name
+y=0.505 Decorative line
+y=0.48  Country name
+y=0.45  Coordinates
 y=0.02  Attribution (bottom-right)
 ```
 
