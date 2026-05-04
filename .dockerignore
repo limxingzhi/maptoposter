@@ -1,0 +1,16 @@
+.git/
+.github/
+posters/
+cache/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+.DS_Store
+uv.lock
+*.egg-info/
+dist/
+build/

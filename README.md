@@ -77,8 +77,12 @@ python create_map_poster.py --city <city> --country <country> [options]
 | **OPTIONAL:** `--distance` | `-d` | Map radius in meters | 18000 |
 | **OPTIONAL:** `--list-themes` | | List all available themes | |
 | **OPTIONAL:** `--all-themes` | | Generate posters for all available themes | |
-| **OPTIONAL:** `--width` | `-W` | Image width in inches | 12 (max: 20) |
-| **OPTIONAL:** `--height` | `-H` | Image height in inches | 16 (max: 20) |
+| **OPTIONAL:** `--width` | `-W` | Image width in pixels | 3600 (max: 6000) |
+| **OPTIONAL:** `--height` | `-H` | Image height in pixels | 4800 (max: 6000) |
+| **OPTIONAL:** `--no-city` | | Hide city name on poster | shown |
+| **OPTIONAL:** `--no-country` | | Hide country name on poster | shown |
+| **OPTIONAL:** `--no-coords` | | Hide coordinates on poster | shown |
+| **OPTIONAL:** `--no-attribution` | | Hide OSM attribution on poster | shown |
 
 ### Multilingual Support - i18n
 
@@ -105,17 +109,18 @@ python create_map_poster.py -c "Dubai" -C "UAE" -dc "دبي" -dC "الإمارا
 
 **Note**: Fonts are automatically downloaded from Google Fonts and cached locally in `fonts/cache/`.
 
-### Resolution Guide (300 DPI)
+### Resolution Guide
 
-Use these values for `-W` and `-H` to target specific resolutions:
+Images are rendered at 300 DPI. Pass `--width` and `--height` in pixels:
 
-| Target | Resolution (px) | Inches (-W / -H) |
-|--------|-----------------|------------------|
-| **Instagram Post** | 1080 x 1080 | 3.6 x 3.6 |
-| **Mobile Wallpaper** | 1080 x 1920 | 3.6 x 6.4 |
-| **HD Wallpaper** | 1920 x 1080 | 6.4 x 3.6 |
-| **4K Wallpaper** | 3840 x 2160 | 12.8 x 7.2 |
-| **A4 Print** | 2480 x 3508 | 8.3 x 11.7 |
+| Target | `--width` `--height` |
+|--------|----------------------|
+| **Instagram Post** | `1080 1080` |
+| **Mobile Wallpaper** | `1080 1920` |
+| **HD Wallpaper** | `1920 1080` |
+| **4K Wallpaper** | `3840 2160` |
+| **A4 Print** | `2480 3508` |
+| **Default (12×16 in print)** | `3600 4800` |
 
 ### Usage Examples
 
@@ -233,6 +238,90 @@ Posters are saved to `posters/` directory with format:
 {city}_{theme}_{YYYYMMDD_HHMMSS}.png
 ```
 
+## Web Server
+
+The application can also be run as an HTTP API server, returning poster images directly via `GET` requests.
+
+### Starting the Server
+
+With `uv`:
+
+```bash
+uv run uvicorn server:app --host 0.0.0.0 --port 8000
+```
+
+With `pip + venv`:
+
+```bash
+source .venv/bin/activate
+uvicorn server:app --host 0.0.0.0 --port 8000
+```
+
+Add `--reload` for development (auto-restarts on code changes).
+
+Interactive API documentation is available at `http://localhost:8000/docs` (Swagger UI).
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/poster` | Generate and return a map poster image |
+| `GET` | `/themes` | List available theme names (JSON) |
+
+### `GET /poster` Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `city` | City name (**required**) | |
+| `country` | Country name (**required**) | |
+| `theme` | Theme name | `terracotta` |
+| `distance` | Map radius in meters | `18000` |
+| `width` | Image width in pixels (max 6000) | `3600` |
+| `height` | Image height in pixels (max 6000) | `4800` |
+| `format` | Output format: `png`, `svg`, `pdf` | `png` |
+| `latitude` | Override latitude center point | |
+| `longitude` | Override longitude center point | |
+| `display_city` | Custom city display name (i18n) | |
+| `display_country` | Custom country display name (i18n) | |
+| `font_family` | Google Fonts family name | |
+| `country_label` | Override country text on poster | |
+| `show_city` | Show city name | `true` |
+| `show_country` | Show country name | `true` |
+| `show_coords` | Show coordinates | `true` |
+| `show_attribution` | Show attribution | `true` |
+
+### Examples
+
+```bash
+# Basic poster
+curl "http://localhost:8000/poster?city=Paris&country=France" -o paris.png
+
+# Custom theme and zoom
+curl "http://localhost:8000/poster?city=Tokyo&country=Japan&theme=japanese_ink&distance=15000" -o tokyo.png
+
+# Multilingual with custom font
+curl "http://localhost:8000/poster?city=Tokyo&country=Japan&display_city=%E6%9D%B1%E4%BA%AC&display_country=%E6%97%A5%E6%9C%AC&font_family=Noto+Sans+JP" -o tokyo_jp.png
+
+# Override coordinates (Manhattan)
+curl "http://localhost:8000/poster?city=New+York&country=USA&latitude=40.776676&longitude=-73.971321&theme=noir" -o manhattan.png
+
+# List themes
+curl "http://localhost:8000/themes"
+```
+
+### Docker
+
+```bash
+# Build
+docker build -t maptoposter .
+
+# Run (mount cache volume to persist OSM data between runs)
+docker run --rm -p 8000:8000 -v $(pwd)/cache:/app/cache maptoposter
+
+# Generate a poster
+curl "http://localhost:8000/poster?city=London&country=UK&theme=noir" -o london.png
+```
+
 ## Adding Custom Themes
 
 Create a JSON file in `themes/` directory:
@@ -259,13 +348,16 @@ Create a JSON file in `themes/` directory:
 
 ```text
 map_poster/
-├── create_map_poster.py    # Main script
+├── create_map_poster.py    # Main script (CLI)
+├── server.py               # HTTP API server (FastAPI)
 ├── font_management.py      # Font loading and Google Fonts integration
+├── Dockerfile              # Container definition
 ├── themes/                 # Theme JSON files
 ├── fonts/                  # Font files
 │   ├── Roboto-*.ttf        # Default Roboto fonts
 │   └── cache/              # Downloaded Google Fonts (auto-generated)
 ├── posters/                # Generated posters
+├── cache/                  # Cached OSM data (auto-generated)
 └── README.md
 ```
 
@@ -277,24 +369,32 @@ Quick reference for contributors who want to extend or modify the script.
 ### Contributors Guide
 
 - Bug fixes are welcomed
-- Don't submit user interface (web/desktop)
-- Don't Dockerize for now
 - If you vibe code any fix please test it and see before and after version of poster
 - Before embarking on a big feature please ask in Discussions/Issue if it will be merged
 
 ### Architecture Overview
 
 ```text
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   CLI Parser    │────▶│  Geocoding   │────▶│  Data Fetching  │
-│   (argparse)    │     │  (Nominatim) │     │    (OSMnx)      │
-└─────────────────┘     └──────────────┘     └─────────────────┘
-                                                     │
-                        ┌──────────────┐             ▼
-                        │    Output    │◀────┌─────────────────┐
-                        │  (matplotlib)│     │   Rendering     │
-                        └──────────────┘     │  (matplotlib)   │
-                                             └─────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Entry Points                            │
+│  ┌─────────────────┐         ┌────────────────────────────┐ │
+│  │   CLI Parser    │         │    HTTP Server (FastAPI)    │ │
+│  │   (argparse)    │         │    GET /poster, /themes     │ │
+│  └────────┬────────┘         └─────────────┬──────────────┘ │
+│           │                                │                │
+└───────────┼────────────────────────────────┼────────────────┘
+            │                                │
+            ▼                                ▼
+  ┌──────────────┐     ┌─────────────────┐
+  │  Geocoding   │────▶│  Data Fetching  │
+  │  (Nominatim) │     │    (OSMnx)      │
+  └──────────────┘     └────────┬────────┘
+                                │
+               ┌──────────────┐ ▼
+               │    Output    │ ┌─────────────────┐
+               │  (matplotlib)│◀│   Rendering     │
+               └──────────────┘ │  (matplotlib)   │
+                                └─────────────────┘
 ```
 
 ### Key Functions
@@ -302,7 +402,8 @@ Quick reference for contributors who want to extend or modify the script.
 | Function | Purpose | Modify when... |
 |----------|---------|----------------|
 | `get_coordinates()` | City → lat/lon via Nominatim | Switching geocoding provider |
-| `create_poster()` | Main rendering pipeline | Adding new map layers |
+| `create_poster()` | Main rendering pipeline (file or buffer) | Adding new map layers |
+| `generate_poster_bytes()` | Render poster to bytes (for HTTP server) | Changing server response format |
 | `get_edge_colors_by_type()` | Road color by OSM highway tag | Changing road styling |
 | `get_edge_widths_by_type()` | Road width by importance | Adjusting line weights |
 | `create_gradient_fade()` | Top/bottom fade effect | Modifying gradient overlay |

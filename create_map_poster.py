@@ -14,10 +14,13 @@ import os
 import pickle
 import sys
 import time
+from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
@@ -252,11 +255,12 @@ def create_gradient_fade(ax, color, location="bottom", zorder=10):
     )
 
 
-def get_edge_colors_by_type(g):
+def get_edge_colors_by_type(g, theme=None):
     """
     Assigns colors to edges based on road type hierarchy.
     Returns a list of colors corresponding to each edge in the graph.
     """
+    _theme = theme if theme is not None else THEME
     edge_colors = []
 
     for _u, _v, data in g.edges(data=True):
@@ -269,17 +273,17 @@ def get_edge_colors_by_type(g):
 
         # Assign color based on road type
         if highway in ["motorway", "motorway_link"]:
-            color = THEME["road_motorway"]
+            color = _theme["road_motorway"]
         elif highway in ["trunk", "trunk_link", "primary", "primary_link"]:
-            color = THEME["road_primary"]
+            color = _theme["road_primary"]
         elif highway in ["secondary", "secondary_link"]:
-            color = THEME["road_secondary"]
+            color = _theme["road_secondary"]
         elif highway in ["tertiary", "tertiary_link"]:
-            color = THEME["road_tertiary"]
+            color = _theme["road_tertiary"]
         elif highway in ["residential", "living_street", "unclassified"]:
-            color = THEME["road_residential"]
+            color = _theme["road_residential"]
         else:
-            color = THEME['road_default']
+            color = _theme['road_default']
 
         edge_colors.append(color)
 
@@ -486,13 +490,18 @@ def create_poster(
     dist,
     output_file,
     output_format,
-    width=12,
-    height=16,
+    width=3600,
+    height=4800,
     country_label=None,
     name_label=None,
     display_city=None,
     display_country=None,
     fonts=None,
+    theme=None,
+    show_city=True,
+    show_country=True,
+    show_coords=True,
+    show_attribution=True,
 ):
     """
     Generate a complete map poster with roads, water, parks, and typography.
@@ -515,6 +524,10 @@ def create_poster(
     Raises:
         RuntimeError: If street network data cannot be retrieved
     """
+    _theme = theme if theme is not None else THEME
+    width_inches = width / 300.0
+    height_inches = height / 300.0
+
     # Handle display names for i18n support
     # Priority: display_city/display_country > name_label/country_label > city/country
     display_city = display_city or name_label or city
@@ -561,8 +574,8 @@ def create_poster(
 
     # 2. Setup Plot
     print("Rendering map...")
-    fig, ax = plt.subplots(figsize=(width, height), facecolor=THEME["bg"])
-    ax.set_facecolor(THEME["bg"])
+    fig, ax = plt.subplots(figsize=(width_inches, height_inches), facecolor=_theme["bg"])
+    ax.set_facecolor(_theme["bg"])
     ax.set_position((0.0, 0.0, 1.0, 1.0))
 
     # Project graph to a metric CRS so distances and aspect are linear (meters)
@@ -579,7 +592,7 @@ def create_poster(
                 water_polys = ox.projection.project_gdf(water_polys)
             except Exception:
                 water_polys = water_polys.to_crs(g_proj.graph['crs'])
-            water_polys.plot(ax=ax, facecolor=THEME['water'], edgecolor='none', zorder=0.5)
+            water_polys.plot(ax=ax, facecolor=_theme['water'], edgecolor='none', zorder=0.5)
 
     if parks is not None and not parks.empty:
         # Filter to only polygon/multipolygon geometries to avoid point features showing as dots
@@ -590,17 +603,17 @@ def create_poster(
                 parks_polys = ox.projection.project_gdf(parks_polys)
             except Exception:
                 parks_polys = parks_polys.to_crs(g_proj.graph['crs'])
-            parks_polys.plot(ax=ax, facecolor=THEME['parks'], edgecolor='none', zorder=0.8)
+            parks_polys.plot(ax=ax, facecolor=_theme['parks'], edgecolor='none', zorder=0.8)
     # Layer 2: Roads with hierarchy coloring
     print("Applying road hierarchy colors...")
-    edge_colors = get_edge_colors_by_type(g_proj)
+    edge_colors = get_edge_colors_by_type(g_proj, theme=_theme)
     edge_widths = get_edge_widths_by_type(g_proj)
 
     # Determine cropping limits to maintain the poster aspect ratio
     crop_xlim, crop_ylim = get_crop_limits(g_proj, point, fig, compensated_dist)
     # Plot the projected graph and then apply the cropped limits
     ox.plot_graph(
-        g_proj, ax=ax, bgcolor=THEME['bg'],
+        g_proj, ax=ax, bgcolor=_theme['bg'],
         node_size=0,
         edge_color=edge_colors,
         edge_linewidth=edge_widths,
@@ -612,12 +625,12 @@ def create_poster(
     ax.set_ylim(crop_ylim)
 
     # Layer 3: Gradients (Top and Bottom)
-    create_gradient_fade(ax, THEME['gradient_color'], location='bottom', zorder=10)
-    create_gradient_fade(ax, THEME['gradient_color'], location='top', zorder=10)
+    create_gradient_fade(ax, _theme['gradient_color'], location='bottom', zorder=10)
+    create_gradient_fade(ax, _theme['gradient_color'], location='top', zorder=10)
 
     # Calculate scale factor based on smaller dimension (reference 12 inches)
     # This ensures text scales properly for both portrait and landscape orientations
-    scale_factor = min(height, width) / 12.0
+    scale_factor = min(height_inches, width_inches) / 12.0
 
     # Base font sizes (at 12 inches width)
     base_main = 60
@@ -681,85 +694,89 @@ def create_poster(
         )
 
     # --- BOTTOM TEXT ---
-    ax.text(
-        0.5,
-        0.14,
-        spaced_city,
-        transform=ax.transAxes,
-        color=THEME["text"],
-        ha="center",
-        fontproperties=font_main_adjusted,
-        zorder=11,
-    )
+    if show_city:
+        ax.text(
+            0.5,
+            0.14,
+            spaced_city,
+            transform=ax.transAxes,
+            color=_theme["text"],
+            ha="center",
+            fontproperties=font_main_adjusted,
+            zorder=11,
+        )
 
-    ax.text(
-        0.5,
-        0.10,
-        display_country.upper(),
-        transform=ax.transAxes,
-        color=THEME["text"],
-        ha="center",
-        fontproperties=font_sub,
-        zorder=11,
-    )
+    if show_country:
+        ax.text(
+            0.5,
+            0.10,
+            display_country.upper(),
+            transform=ax.transAxes,
+            color=_theme["text"],
+            ha="center",
+            fontproperties=font_sub,
+            zorder=11,
+        )
 
-    lat, lon = point
-    coords = (
-        f"{lat:.4f}° N / {lon:.4f}° E"
-        if lat >= 0
-        else f"{abs(lat):.4f}° S / {lon:.4f}° E"
-    )
-    if lon < 0:
-        coords = coords.replace("E", "W")
+    if show_coords:
+        lat, lon = point
+        coords = (
+            f"{lat:.4f}° N / {lon:.4f}° E"
+            if lat >= 0
+            else f"{abs(lat):.4f}° S / {lon:.4f}° E"
+        )
+        if lon < 0:
+            coords = coords.replace("E", "W")
 
-    ax.text(
-        0.5,
-        0.07,
-        coords,
-        transform=ax.transAxes,
-        color=THEME["text"],
-        alpha=0.7,
-        ha="center",
-        fontproperties=font_coords,
-        zorder=11,
-    )
+        ax.text(
+            0.5,
+            0.07,
+            coords,
+            transform=ax.transAxes,
+            color=_theme["text"],
+            alpha=0.7,
+            ha="center",
+            fontproperties=font_coords,
+            zorder=11,
+        )
 
-    ax.plot(
-        [0.4, 0.6],
-        [0.125, 0.125],
-        transform=ax.transAxes,
-        color=THEME["text"],
-        linewidth=1 * scale_factor,
-        zorder=11,
-    )
+    if show_city:
+        ax.plot(
+            [0.4, 0.6],
+            [0.125, 0.125],
+            transform=ax.transAxes,
+            color=_theme["text"],
+            linewidth=1 * scale_factor,
+            zorder=11,
+        )
 
     # --- ATTRIBUTION (bottom right) ---
-    if FONTS:
-        font_attr = FontProperties(fname=FONTS["light"], size=8)
-    else:
-        font_attr = FontProperties(family="monospace", size=8)
+    if show_attribution:
+        if FONTS:
+            font_attr = FontProperties(fname=FONTS["light"], size=8)
+        else:
+            font_attr = FontProperties(family="monospace", size=8)
 
-    ax.text(
-        0.98,
-        0.02,
-        "© OpenStreetMap contributors",
-        transform=ax.transAxes,
-        color=THEME["text"],
-        alpha=0.5,
-        ha="right",
-        va="bottom",
-        fontproperties=font_attr,
-        zorder=11,
-    )
+        ax.text(
+            0.98,
+            0.02,
+            "© OpenStreetMap contributors",
+            transform=ax.transAxes,
+            color=_theme["text"],
+            alpha=0.5,
+            ha="right",
+            va="bottom",
+            fontproperties=font_attr,
+            zorder=11,
+        )
 
     # 5. Save
-    print(f"Saving to {output_file}...")
+    if isinstance(output_file, str):
+        print(f"Saving to {output_file}...")
 
     fmt = output_format.lower()
     save_kwargs = dict(
-        facecolor=THEME["bg"],
-        bbox_inches="tight",
-        pad_inches=0.05,
+        facecolor=_theme["bg"],
     )
 
     # DPI matters mainly for raster formats
@@ -769,7 +786,39 @@ def create_poster(
     plt.savefig(output_file, format=fmt, **save_kwargs)
 
     plt.close()
-    print(f"✓ Done! Poster saved as {output_file}")
+    if isinstance(output_file, str):
+        print(f"✓ Done! Poster saved as {output_file}")
+    else:
+        print("✓ Done! Poster generated")
+
+
+def generate_poster_bytes(
+    city,
+    country,
+    point,
+    dist,
+    output_format="png",
+    width=3600,
+    height=4800,
+    country_label=None,
+    name_label=None,
+    display_city=None,
+    display_country=None,
+    fonts=None,
+    theme=None,
+    show_city=True,
+    show_country=True,
+    show_coords=True,
+    show_attribution=True,
+):
+    buf = BytesIO()
+    create_poster(
+        city, country, point, dist, buf, output_format,
+        width, height, country_label, name_label,
+        display_city, display_country, fonts, theme,
+        show_city, show_country, show_coords, show_attribution,
+    )
+    return buf.getvalue()
 
 
 def print_examples():
@@ -917,16 +966,16 @@ Examples:
     parser.add_argument(
         "--width",
         "-W",
-        type=float,
-        default=12,
-        help="Image width in inches (default: 12, max: 20 )",
+        type=int,
+        default=3600,
+        help="Image width in pixels (default: 3600, max: 6000)",
     )
     parser.add_argument(
         "--height",
         "-H",
-        type=float,
-        default=16,
-        help="Image height in inches (default: 16, max: 20)",
+        type=int,
+        default=4800,
+        help="Image height in pixels (default: 4800, max: 6000)",
     )
     parser.add_argument(
         "--list-themes", action="store_true", help="List all available themes"
@@ -955,6 +1004,10 @@ Examples:
         choices=["png", "svg", "pdf"],
         help="Output format for the poster (default: png)",
     )
+    parser.add_argument("--no-city", dest="show_city", action="store_false", help="Hide city name")
+    parser.add_argument("--no-country", dest="show_country", action="store_false", help="Hide country name")
+    parser.add_argument("--no-coords", dest="show_coords", action="store_false", help="Hide coordinates")
+    parser.add_argument("--no-attribution", dest="show_attribution", action="store_false", help="Hide attribution")
 
     args = parser.parse_args()
 
@@ -975,16 +1028,16 @@ Examples:
         sys.exit(1)
 
     # Enforce maximum dimensions
-    if args.width > 20:
+    if args.width > 6000:
         print(
-            f"⚠ Width {args.width} exceeds the maximum allowed limit of 20. It's enforced as max limit 20."
+            f"⚠ Width {args.width} exceeds the maximum allowed limit of 6000. It's enforced as max limit 6000."
         )
-        args.width = 20.0
-    if args.height > 20:
+        args.width = 6000
+    if args.height > 6000:
         print(
-            f"⚠ Height {args.height} exceeds the maximum allowed limit of 20. It's enforced as max limit 20."
+            f"⚠ Height {args.height} exceeds the maximum allowed limit of 6000. It's enforced as max limit 6000."
         )
-        args.height = 20.0
+        args.height = 6000
 
     available_themes = get_available_themes()
     if not available_themes:
@@ -1037,6 +1090,10 @@ Examples:
                 display_city=args.display_city,
                 display_country=args.display_country,
                 fonts=custom_fonts,
+                show_city=args.show_city,
+                show_country=args.show_country,
+                show_coords=args.show_coords,
+                show_attribution=args.show_attribution,
             )
 
         print("\n" + "=" * 50)
