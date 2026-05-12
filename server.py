@@ -58,6 +58,7 @@ def get_poster(
     show_coords: bool = Query(True, description="Show coordinates"),
     show_attribution: bool = Query(True, description="Show attribution"),
     text_position: Literal["bottom", "top", "center"] = Query("bottom", description="Position of text labels"),
+    font_size: Optional[float] = Query(None, description="Font size multiplier (e.g. 1.5 for 50% larger)"),
 ):
     available_themes = get_available_themes()
     if theme not in available_themes:
@@ -97,6 +98,7 @@ def get_poster(
             show_coords=show_coords,
             show_attribution=show_attribution,
             text_position=text_position,
+            font_size=font_size,
         )
 
         return Response(

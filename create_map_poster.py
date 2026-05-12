@@ -531,6 +531,7 @@ def create_poster(
     show_coords=True,
     show_attribution=True,
     text_position="bottom",
+    font_size=None,
 ):
     """
     Generate a complete map poster with roads, water, parks, and typography.
@@ -723,6 +724,31 @@ def create_poster(
             family="monospace", weight="bold", size=adjusted_font_size
         )
 
+    if font_size is not None:
+        adjusted_font_size *= font_size
+        font_main_adjusted = FontProperties(
+            fname=active_fonts["bold"] if active_fonts else None,
+            family="monospace" if not active_fonts else None,
+            weight="bold" if not active_fonts else None,
+            size=adjusted_font_size,
+        )
+        font_sub = FontProperties(
+            fname=active_fonts["light"] if active_fonts else None,
+            family="monospace" if not active_fonts else None,
+            weight="normal" if not active_fonts else None,
+            size=base_sub * scale_factor * font_size,
+        )
+        font_coords = FontProperties(
+            fname=active_fonts["regular"] if active_fonts else None,
+            family="monospace" if not active_fonts else None,
+            size=base_coords * scale_factor * font_size,
+        )
+        font_attr = FontProperties(
+            fname=active_fonts["light"] if active_fonts else None,
+            family="monospace" if not active_fonts else None,
+            size=base_attr * scale_factor * font_size,
+        )
+
     pos = TEXT_POSITIONS[text_position]
 
     if show_city:
@@ -841,6 +867,7 @@ def generate_poster_bytes(
     show_coords=True,
     show_attribution=True,
     text_position="bottom",
+    font_size=None,
 ):
     buf = BytesIO()
     create_poster(
@@ -849,6 +876,7 @@ def generate_poster_bytes(
         display_city, display_country, fonts, theme,
         show_city, show_country, show_coords, show_attribution,
         text_position=text_position,
+        font_size=font_size,
     )
     return buf.getvalue()
 

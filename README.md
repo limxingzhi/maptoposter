@@ -297,6 +297,7 @@ Interactive API documentation is available at `http://localhost:8000/docs` (Swag
 | `show_coords` | Show coordinates | `true` |
 | `show_attribution` | Show attribution | `true` |
 | `text_position` | Text label position: `bottom`, `top`, `center` | `bottom` |
+| `font_size` | Font size multiplier (e.g. `1.5` for 50% larger, `0.5` for half) | |
 
 ### Examples
 
