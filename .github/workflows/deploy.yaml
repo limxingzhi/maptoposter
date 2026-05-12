@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
 
 jobs:
   build-and-push:
@@ -33,6 +34,18 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set image tags
+        id: tags
+        run: |
+          REPO=ghcr.io/${{ github.repository }}
+          DATE=${{ steps.date.outputs.date }}
+          BRANCH=${GITHUB_REF_NAME}
+          if [ "$BRANCH" = "main" ]; then
+            echo "tags=${REPO}:latest,${REPO}:${DATE}" >> $GITHUB_OUTPUT
+          else
+            echo "tags=${REPO}:${BRANCH},${REPO}:${BRANCH}-${DATE}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -40,5 +53,4 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.date.outputs.date }}
+            ${{ steps.tags.outputs.tags }}
